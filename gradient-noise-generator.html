@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient Noise Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #141417;
+    --surface2: #1c1c21;
+    --border: #2a2a32;
+    --border-hover: #44444f;
+    --text: #f0f0f4;
+    --text-muted: #7a7a8c;
+    --text-dim: #3f3f50;
+    --accent: #c8f060;
+    --accent-dim: rgba(200,240,96,0.12);
+    --accent-glow: rgba(200,240,96,0.3);
+    --red: #ff5555;
+    --panel-w: 340px;
+    --radius: 10px;
+    --radius-sm: 6px;
+    font-size: 13px;
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── LEFT PANEL ── */
+  #panel {
+    width: var(--panel-w);
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #panel-header {
+    padding: 22px 24px 18px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #panel-header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  #panel-header p {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
+  #panel-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  #panel-scroll::-webkit-scrollbar { width: 4px; }
+  #panel-scroll::-webkit-scrollbar-track { background: transparent; }
+  #panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* Sections */
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* Color pickers */
+  #color-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    transition: border-color 0.2s;
+  }
+
+  .color-row:hover { border-color: var(--border-hover); }
+
+  .color-swatch-wrap {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.08);
+    transition: border-color 0.2s;
+  }
+
+  .color-swatch-wrap:hover { border-color: rgba(255,255,255,0.2); }
+
+  .color-swatch-wrap input[type="color"] {
+    position: absolute;
+    inset: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+    border: none;
+    outline: none;
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .color-preview {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 4px;
+  }
+
+  .color-hex {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    outline: none;
+    letter-spacing: 0.05em;
+  }
+
+  .color-hex:focus { color: var(--text); }
+
+  .color-remove {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .color-remove:hover {
+    background: rgba(255,85,85,0.12);
+    border-color: rgba(255,85,85,0.3);
+    color: var(--red);
+  }
+
+  #add-color-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 9px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  #add-color-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  #add-color-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    border-style: dashed;
+    color: var(--text-dim);
+  }
+
+  /* Sliders */
+  .slider-row {
+    margin-bottom: 16px;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .slider-name {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .slider-value {
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(200,240,96,0.2);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 5px rgba(200,240,96,0.3);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+  }
+
+  /* Angle visual */
+  #angle-visual {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  #angle-dial {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+
+  #angle-dial:hover { border-color: var(--accent); }
+
+  #angle-needle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 1px;
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(0deg);
+    transition: transform 0.1s;
+    margin-top: -14px;
+    margin-left: -1px;
+  }
+
+  #angle-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  #angle-input-box {
+    flex: 1;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0c0c0e;
+    font-weight: 600;
+  }
+
+  .btn-accent:hover {
+    background: #d8ff80;
+    border-color: #d8ff80;
+    color: #0c0c0e;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .btn-group .btn { flex: 1; }
+
+  /* Resolution */
+  .res-options {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .res-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .res-chip:hover, .res-chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .custom-res {
+    display: none;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .custom-res.visible { display: flex; }
+
+  .custom-res input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .custom-res input:focus { border-color: var(--accent); }
+  .custom-res span { color: var(--text-dim); font-size: 12px; }
+
+  /* Notification */
+  #notify {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 12px;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  #notify.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  /* ── RIGHT: PREVIEW ── */
+  #preview-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  #preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #preview-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #preview-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+  }
+
+  #size-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+
+  #preview-toolbar-right {
+    display: flex;
+    gap: 8px;
+  }
+
+  .toolbar-btn {
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .toolbar-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  #canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    background: repeating-conic-gradient(#16161a 0% 25%, #121216 0% 50%) 0 0 / 24px 24px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #main-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+    display: block;
+    object-fit: contain;
+  }
+
+  /* Hidden canvas for export */
+  #export-canvas { display: none; }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* Noise mode toggle */
+  .noise-type-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .noise-chip {
+    flex: 1;
+    padding: 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .noise-chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  /* Gradient mode */
+  .grad-type-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .grad-chip {
+    flex: 1;
+    padding: 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .grad-chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .icon { font-style: normal; }
+</style>
+</head>
+<body>
+
+<!-- ── LEFT PANEL ── -->
+<div id="panel">
+  <div id="panel-header">
+    <h1>Gradient Noise</h1>
+    <p>Generator — v1.0</p>
+  </div>
+
+  <div id="panel-scroll">
+
+    <!-- COLORS -->
+    <div class="section">
+      <div class="section-label">Colors</div>
+      <div id="color-list"></div>
+      <button id="add-color-btn">＋ Add Color</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- GRADIENT -->
+    <div class="section">
+      <div class="section-label">Gradient</div>
+
+      <div class="grad-type-row">
+        <button class="grad-chip active" data-gtype="linear">Linear</button>
+        <button class="grad-chip" data-gtype="radial">Radial</button>
+        <button class="grad-chip" data-gtype="conic">Conic</button>
+      </div>
+
+      <div id="angle-section">
+        <div class="slider-header">
+          <span class="slider-name">Angle</span>
+          <span class="slider-value" id="angle-display">90°</span>
+        </div>
+        <div id="angle-visual">
+          <div id="angle-dial">
+            <div id="angle-needle"></div>
+            <div id="angle-center"></div>
+          </div>
+          <div id="angle-input-box">
+            <input type="range" id="angle-slider" min="0" max="360" value="90">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- NOISE -->
+    <div class="section">
+      <div class="section-label">Noise</div>
+
+      <div class="noise-type-row">
+        <button class="noise-chip active" data-ntype="grain">Film Grain</button>
+        <button class="noise-chip" data-ntype="perlin">Perlin</button>
+        <button class="noise-chip" data-ntype="rgb">RGB Grain</button>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-name">Intensity</span>
+          <span class="slider-value" id="noise-display">20</span>
+        </div>
+        <input type="range" id="noise-slider" min="0" max="100" value="20">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-name">Scale</span>
+          <span class="slider-value" id="noise-scale-display">1.0</span>
+        </div>
+        <input type="range" id="noise-scale-slider" min="1" max="40" value="10">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ACTIONS -->
+    <div class="section">
+      <div class="section-label">Quick Actions</div>
+      <div class="btn-group">
+        <button class="btn" id="randomize-btn">⚄ Randomize</button>
+        <button class="btn" id="copy-css-btn">⎘ CSS</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- EXPORT -->
+    <div class="section">
+      <div class="section-label">Export</div>
+
+      <div class="res-options">
+        <button class="res-chip active" data-w="1080" data-h="1080">1:1</button>
+        <button class="res-chip" data-w="1920" data-h="1080">16:9</button>
+        <button class="res-chip" data-w="1080" data-h="1920">9:16</button>
+        <button class="res-chip custom-trigger">Custom</button>
+      </div>
+
+      <div class="custom-res" id="custom-res-row">
+        <input type="number" id="custom-w" placeholder="W" value="1200" min="1" max="8000">
+        <span>×</span>
+        <input type="number" id="custom-h" placeholder="H" value="800" min="1" max="8000">
+      </div>
+
+      <div class="btn-group" style="margin-top:4px">
+        <button class="btn btn-accent" id="dl-png-btn">↓ PNG</button>
+        <button class="btn btn-accent" id="dl-jpg-btn">↓ JPEG</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── RIGHT PREVIEW ── -->
+<div id="preview-area">
+  <div id="preview-toolbar">
+    <div id="preview-toolbar-left">
+      <span id="preview-label">PREVIEW</span>
+      <span id="size-badge">1080 × 1080</span>
+    </div>
+    <div id="preview-toolbar-right">
+      <button class="toolbar-btn" id="tb-randomize">⚄ Randomize</button>
+      <button class="toolbar-btn" id="tb-copy-css">⎘ Copy CSS</button>
+    </div>
+  </div>
+
+  <div id="canvas-container">
+    <canvas id="main-canvas"></canvas>
+  </div>
+</div>
+
+<canvas id="export-canvas"></canvas>
+<div id="notify">Copied to clipboard!</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const state = {
+  colors: ['#ff6b6b', '#c849ff', '#4ecdc4'],
+  angle: 90,
+  noiseIntensity: 20,
+  noiseScale: 1.0,
+  noiseType: 'grain',
+  gradType: 'linear',
+  exportW: 1080,
+  exportH: 1080,
+  seed: Math.random() * 10000
+};
+
+// ─────────────────────────────────────────────
+//  ELEMENTS
+// ─────────────────────────────────────────────
+const colorList     = document.getElementById('color-list');
+const addColorBtn   = document.getElementById('add-color-btn');
+const angleSlider   = document.getElementById('angle-slider');
+const angleDisplay  = document.getElementById('angle-display');
+const angleNeedle   = document.getElementById('angle-needle');
+const angleDial     = document.getElementById('angle-dial');
+const noiseSlider   = document.getElementById('noise-slider');
+const noiseDisplay  = document.getElementById('noise-display');
+const noiseScaleSlider = document.getElementById('noise-scale-slider');
+const noiseScaleDisplay = document.getElementById('noise-scale-display');
+const mainCanvas    = document.getElementById('main-canvas');
+const exportCanvas  = document.getElementById('export-canvas');
+const sizeBadge     = document.getElementById('size-badge');
+const notify        = document.getElementById('notify');
+const customResRow  = document.getElementById('custom-res-row');
+const customW       = document.getElementById('custom-w');
+const customH       = document.getElementById('custom-h');
+const mainCtx       = mainCanvas.getContext('2d');
+const exportCtx     = exportCanvas.getContext('2d');
+
+let renderRAF = null;
+
+// ─────────────────────────────────────────────
+//  PERLIN NOISE (minimal implementation)
+// ─────────────────────────────────────────────
+const perm = new Uint8Array(512);
+(function initPerm() {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+})();
+
+function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+function lerp(a, b, t) { return a + t * (b - a); }
+function grad(h, x, y) {
+  h &= 3;
+  const u = h < 2 ? x : y, v = h < 2 ? y : x;
+  return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+}
+
+function perlinNoise(x, y) {
+  const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+  x -= Math.floor(x); y -= Math.floor(y);
+  const u = fade(x), v = fade(y);
+  const a = perm[X] + Y, b = perm[X + 1] + Y;
+  return lerp(
+    lerp(grad(perm[a], x, y),     grad(perm[b], x - 1, y),     u),
+    lerp(grad(perm[a + 1], x, y - 1), grad(perm[b + 1], x - 1, y - 1), u),
+    v
+  );
+}
+
+function fbm(x, y, octaves = 4) {
+  let val = 0, amp = 0.5, freq = 1, max = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += perlinNoise(x * freq, y * freq) * amp;
+    max += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / max;
+}
+
+// ─────────────────────────────────────────────
+//  COLOR UTILITIES
+// ─────────────────────────────────────────────
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  const n = parseInt(hex, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+}
+
+function randomHex() {
+  return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+}
+
+// ─────────────────────────────────────────────
+//  GRADIENT RENDERING
+// ─────────────────────────────────────────────
+function drawGradientToCtx(ctx, w, h) {
+  const { colors, angle, gradType } = state;
+  if (colors.length === 0) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); return; }
+
+  let grad;
+  const rad = (angle - 90) * Math.PI / 180;
+
+  if (gradType === 'linear') {
+    const cx = w / 2, cy = h / 2;
+    const len = Math.sqrt(w * w + h * h) / 2;
+    grad = ctx.createLinearGradient(
+      cx - Math.cos(rad) * len, cy - Math.sin(rad) * len,
+      cx + Math.cos(rad) * len, cy + Math.sin(rad) * len
+    );
+  } else if (gradType === 'radial') {
+    grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.min(w, h) * 0.7);
+  } else {
+    grad = ctx.createConicGradient((angle - 90) * Math.PI / 180, w / 2, h / 2);
+  }
+
+  const n = colors.length;
+  colors.forEach((c, i) => grad.addColorStop(i / (n - 1 || 1), c));
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function applyNoise(ctx, w, h) {
+  const { noiseIntensity, noiseType, noiseScale, seed } = state;
+  if (noiseIntensity === 0) return;
+
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  const scale = noiseScale / Math.max(w, h);
+  const strength = noiseIntensity / 100;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+
+      if (noiseType === 'grain') {
+        // Film grain: fast pseudo-random per-pixel noise
+        // Use a hash for speed
+        const n = hashNoise(x, y, seed) * 2 - 1;
+        const delta = n * strength * 80;
+        data[idx]     = clamp(data[idx]     + delta);
+        data[idx + 1] = clamp(data[idx + 1] + delta);
+        data[idx + 2] = clamp(data[idx + 2] + delta);
+
+      } else if (noiseType === 'perlin') {
+        const nx = x * scale * noiseScale * 3 + seed;
+        const ny = y * scale * noiseScale * 3;
+        const n = fbm(nx, ny) * 2;
+        const delta = n * strength * 90;
+        data[idx]     = clamp(data[idx]     + delta);
+        data[idx + 1] = clamp(data[idx + 1] + delta);
+        data[idx + 2] = clamp(data[idx + 2] + delta);
+
+      } else {
+        // RGB grain: separate noise per channel
+        const nr = hashNoise(x * 3 + 0, y * 3 + 0, seed) * 2 - 1;
+        const ng = hashNoise(x * 3 + 1, y * 3 + 1, seed) * 2 - 1;
+        const nb = hashNoise(x * 3 + 2, y * 3 + 2, seed) * 2 - 1;
+        const s = strength * 70;
+        data[idx]     = clamp(data[idx]     + nr * s);
+        data[idx + 1] = clamp(data[idx + 1] + ng * s);
+        data[idx + 2] = clamp(data[idx + 2] + nb * s);
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// Fast hash noise — no trig, deterministic per pixel
+function hashNoise(x, y, seed) {
+  // Adapted from "hash without sine" technique
+  let n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.3) * 43758.5453123;
+  return n - Math.floor(n);
+}
+
+function clamp(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+// ─────────────────────────────────────────────
+//  MAIN RENDER
+// ─────────────────────────────────────────────
+function scheduleRender() {
+  if (renderRAF) cancelAnimationFrame(renderRAF);
+  renderRAF = requestAnimationFrame(doRender);
+}
+
+function doRender() {
+  const container = document.getElementById('canvas-container');
+  const maxW = container.clientWidth - 64;
+  const maxH = container.clientHeight - 64;
+
+  const targetW = state.exportW;
+  const targetH = state.exportH;
+  const ratio = Math.min(maxW / targetW, maxH / targetH, 1);
+  const dw = Math.round(targetW * ratio);
+  const dh = Math.round(targetH * ratio);
+
+  mainCanvas.width  = dw;
+  mainCanvas.height = dh;
+
+  drawGradientToCtx(mainCtx, dw, dh);
+  applyNoise(mainCtx, dw, dh);
+
+  sizeBadge.textContent = `${state.exportW} × ${state.exportH}`;
+}
+
+// ─────────────────────────────────────────────
+//  EXPORT
+// ─────────────────────────────────────────────
+function exportImage(format) {
+  const w = state.exportW;
+  const h = state.exportH;
+  exportCanvas.width  = w;
+  exportCanvas.height = h;
+
+  drawGradientToCtx(exportCtx, w, h);
+  applyNoise(exportCtx, w, h);
+
+  const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+  const quality = format === 'jpeg' ? 0.95 : undefined;
+  const url = quality !== undefined
+    ? exportCanvas.toDataURL(mime, quality)
+    : exportCanvas.toDataURL(mime);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gradient-noise-${w}x${h}.${format}`;
+  a.click();
+  showNotify(`Exported ${format.toUpperCase()} — ${w}×${h}`);
+}
+
+// ─────────────────────────────────────────────
+//  CSS GRADIENT STRING
+// ─────────────────────────────────────────────
+function getCSSGradient() {
+  const { colors, angle, gradType } = state;
+  const stops = colors.map((c, i) => `${c} ${Math.round(i / (colors.length - 1 || 1) * 100)}%`).join(', ');
+  if (gradType === 'linear') return `linear-gradient(${angle}deg, ${stops})`;
+  if (gradType === 'radial') return `radial-gradient(circle, ${stops})`;
+  return `conic-gradient(from ${angle}deg, ${stops})`;
+}
+
+// ─────────────────────────────────────────────
+//  COLOR ROW UI
+// ─────────────────────────────────────────────
+function buildColorList() {
+  colorList.innerHTML = '';
+  state.colors.forEach((color, i) => {
+    const row = document.createElement('div');
+    row.className = 'color-row';
+    row.dataset.index = i;
+
+    row.innerHTML = `
+      <div class="color-swatch-wrap">
+        <div class="color-preview" style="background:${color}"></div>
+        <input type="color" value="${color}" data-index="${i}">
+      </div>
+      <input type="text" class="color-hex" value="${color}" maxlength="7" data-index="${i}">
+      <button class="color-remove" data-index="${i}" title="Remove">×</button>
+    `;
+
+    const picker = row.querySelector('input[type="color"]');
+    const preview = row.querySelector('.color-preview');
+    const hexInput = row.querySelector('.color-hex');
+    const removeBtn = row.querySelector('.color-remove');
+
+    picker.addEventListener('input', (e) => {
+      const val = e.target.value;
+      state.colors[i] = val;
+      preview.style.background = val;
+      hexInput.value = val;
+      scheduleRender();
+    });
+
+    hexInput.addEventListener('input', (e) => {
+      let val = e.target.value;
+      if (!val.startsWith('#')) val = '#' + val;
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        state.colors[i] = val;
+        picker.value = val;
+        preview.style.background = val;
+        scheduleRender();
+      }
+    });
+
+    hexInput.addEventListener('blur', (e) => {
+      e.target.value = state.colors[i];
+    });
+
+    removeBtn.addEventListener('click', () => {
+      if (state.colors.length <= 2) return;
+      state.colors.splice(i, 1);
+      buildColorList();
+      scheduleRender();
+    });
+
+    // Disable remove if only 2 left
+    if (state.colors.length <= 2) {
+      removeBtn.style.display = 'none';
+    }
+
+    colorList.appendChild(row);
+  });
+
+  addColorBtn.disabled = state.colors.length >= 4;
+}
+
+// ─────────────────────────────────────────────
+//  NOTIFICATION
+// ─────────────────────────────────────────────
+let notifyTimer;
+function showNotify(msg) {
+  notify.textContent = msg;
+  notify.classList.add('show');
+  clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => notify.classList.remove('show'), 2200);
+}
+
+// ─────────────────────────────────────────────
+//  ANGLE DIAL DRAG
+// ─────────────────────────────────────────────
+let dialDragging = false;
+
+angleDial.addEventListener('mousedown', (e) => {
+  dialDragging = true;
+  updateDialAngle(e);
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!dialDragging) return;
+  updateDialAngle(e);
+});
+
+document.addEventListener('mouseup', () => { dialDragging = false; });
+
+function updateDialAngle(e) {
+  const rect = angleDial.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI + 90;
+  angle = ((Math.round(angle) % 360) + 360) % 360;
+  state.angle = angle;
+  angleSlider.value = angle;
+  updateAngleDisplay(angle);
+  scheduleRender();
+}
+
+function updateAngleDisplay(a) {
+  angleDisplay.textContent = `${a}°`;
+  angleNeedle.style.transform = `translateX(-50%) rotate(${a}deg)`;
+}
+
+// ─────────────────────────────────────────────
+//  EVENT LISTENERS
+// ─────────────────────────────────────────────
+
+// Angle slider
+angleSlider.addEventListener('input', (e) => {
+  state.angle = +e.target.value;
+  updateAngleDisplay(state.angle);
+  scheduleRender();
+});
+
+// Noise slider
+noiseSlider.addEventListener('input', (e) => {
+  state.noiseIntensity = +e.target.value;
+  noiseDisplay.textContent = e.target.value;
+  scheduleRender();
+});
+
+// Noise scale slider
+noiseScaleSlider.addEventListener('input', (e) => {
+  state.noiseScale = +(+e.target.value / 10).toFixed(1);
+  noiseScaleDisplay.textContent = state.noiseScale.toFixed(1);
+  scheduleRender();
+});
+
+// Add color
+addColorBtn.addEventListener('click', () => {
+  if (state.colors.length >= 4) return;
+  state.colors.push(randomHex());
+  buildColorList();
+  scheduleRender();
+});
+
+// Noise type chips
+document.querySelectorAll('.noise-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.noise-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.noiseType = btn.dataset.ntype;
+    state.seed = Math.random() * 10000; // re-seed for variety
+    scheduleRender();
+  });
+});
+
+// Gradient type chips
+document.querySelectorAll('.grad-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.grad-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.gradType = btn.dataset.gtype;
+    const angleSection = document.getElementById('angle-section');
+    angleSection.style.display = (state.gradType === 'radial') ? 'none' : '';
+    scheduleRender();
+  });
+});
+
+// Resolution chips
+document.querySelectorAll('.res-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.res-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.classList.contains('custom-trigger')) {
+      customResRow.classList.add('visible');
+    } else {
+      customResRow.classList.remove('visible');
+      state.exportW = +btn.dataset.w;
+      state.exportH = +btn.dataset.h;
+      scheduleRender();
+    }
+  });
+});
+
+customW.addEventListener('change', () => {
+  state.exportW = Math.max(1, Math.min(8000, +customW.value || 1200));
+  scheduleRender();
+});
+
+customH.addEventListener('change', () => {
+  state.exportH = Math.max(1, Math.min(8000, +customH.value || 800));
+  scheduleRender();
+});
+
+// Download buttons
+document.getElementById('dl-png-btn').addEventListener('click', () => exportImage('png'));
+document.getElementById('dl-jpg-btn').addEventListener('click', () => exportImage('jpeg'));
+
+// Randomize
+function randomizeColors() {
+  state.colors = Array.from({ length: 2 + Math.floor(Math.random() * 3) }, randomHex);
+  state.angle = Math.floor(Math.random() * 360);
+  state.seed = Math.random() * 10000;
+  angleSlider.value = state.angle;
+  updateAngleDisplay(state.angle);
+  buildColorList();
+  scheduleRender();
+}
+
+document.getElementById('randomize-btn').addEventListener('click', randomizeColors);
+document.getElementById('tb-randomize').addEventListener('click', randomizeColors);
+
+// Copy CSS
+function copyCss() {
+  const css = `background: ${getCSSGradient()};`;
+  navigator.clipboard.writeText(css).then(() => {
+    showNotify('CSS gradient copied!');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = css;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showNotify('CSS gradient copied!');
+  });
+}
+
+document.getElementById('copy-css-btn').addEventListener('click', copyCss);
+document.getElementById('tb-copy-css').addEventListener('click', copyCss);
+
+// ─────────────────────────────────────────────
+//  RESIZE OBSERVER
+// ─────────────────────────────────────────────
+const resizeObserver = new ResizeObserver(() => scheduleRender());
+resizeObserver.observe(document.getElementById('canvas-container'));
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+buildColorList();
+updateAngleDisplay(state.angle);
+noiseDisplay.textContent = state.noiseIntensity;
+noiseScaleDisplay.textContent = state.noiseScale.toFixed(1);
+scheduleRender();
+</script>
+</body>
+</html>
